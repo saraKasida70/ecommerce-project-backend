@@ -27,3 +27,5 @@ yarn-error.log
 /storage/framework/testing/*
 /storage/framework/views/*
 /bootstrap/cache/*.php
+.env.docker
+database-backup.sql
