@@ -1,0 +1,151 @@
+
+.cart-page {
+  direction: rtl;
+}
+
+.cart-page > h1 {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.cart-subtitle {
+  color: #88899a;
+  margin-bottom: 30px;
+}
+
+.cart-empty {
+  background: white;
+  padding: 60px 20px;
+  border-radius: 15px;
+  text-align: center;
+}
+
+.cart-empty span {
+  font-size: 60px;
+}
+
+.cart-empty h2 {
+  margin: 15px 0 10px;
+}
+
+.cart-empty p {
+  color: #88899a;
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.cart-item {
+  background: white;
+  padding: 18px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cart-item > img {
+  width: 110px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.cart-item-info {
+  flex: 1;
+}
+
+.cart-item-info h3 {
+  margin-bottom: 10px;
+}
+
+.cart-item-info p {
+  color: #5546d9;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.quantity-controls button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: #f0efff;
+  color: #5546d9;
+  font-weight: bold;
+}
+
+.quantity-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.remove-button {
+  border: none;
+  background: #fff0f0;
+  color: #e04444;
+  padding: 10px 15px;
+  border-radius: 8px;
+}
+
+.cart-summary {
+  background: white;
+  padding: 25px;
+  border-radius: 15px;
+  margin-top: 25px;
+}
+
+.cart-summary h2 {
+  margin-bottom: 20px;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.cart-total strong {
+  color: #5546d9;
+}
+
+.checkout-button {
+  width: 100%;
+  padding: 15px;
+  background: #5546d9;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+@media (max-width: 550px) {
+  .cart-item {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .cart-item > img {
+    width: 80px;
+    height: 85px;
+  }
+
+  .cart-item-info h3 {
+    font-size: 14px;
+  }
+
+  .remove-button {
+    padding: 8px;
+    font-size: 12px;
+  }
+}
