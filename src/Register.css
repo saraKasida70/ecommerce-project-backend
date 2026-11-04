@@ -1,0 +1,149 @@
+
+.register-page {
+  min-height: 75vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 45px 20px;
+  background: #f7f8fc;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 35px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 8px 35px rgba(0, 0, 0, 0.07);
+  text-align: center;
+}
+
+.register-icon {
+  width: 65px;
+  height: 65px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef0ff;
+  border-radius: 50%;
+  font-size: 30px;
+}
+
+.register-card h1 {
+  margin-bottom: 10px;
+  color: #222;
+  font-size: 27px;
+}
+
+.register-subtitle {
+  margin-bottom: 28px;
+  color: #777;
+  font-size: 14px;
+}
+
+.register-field {
+  margin-bottom: 18px;
+  text-align: right;
+}
+
+.register-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.register-field input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: 0.2s;
+}
+
+.register-field input:focus {
+  border-color: #6558d3;
+  box-shadow: 0 0 0 3px rgba(101, 88, 211, 0.1);
+}
+
+.register-submit {
+  width: 100%;
+  padding: 14px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 9px;
+  background: #6558d3;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.register-submit:hover {
+  background: #5144bd;
+}
+
+.register-error,
+.register-success {
+  padding: 11px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.register-error {
+  color: #b42318;
+  background: #fff0ee;
+}
+
+.register-success {
+  color: #187044;
+  background: #eaf8f0;
+}
+
+.register-login {
+  margin-top: 23px;
+  color: #666;
+  font-size: 14px;
+}
+
+.register-login a {
+  color: #6558d3;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.register-login a:hover {
+  text-decoration: underline;
+}
+
+.register-back {
+  margin-top: 20px;
+  padding: 10px 18px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #555;
+  cursor: pointer;
+}
+
+.register-back:hover {
+  background: #f5f5f5;
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: 25px 20px;
+  }
+
+  .register-card h1 {
+    font-size: 23px;
+  }
+}
