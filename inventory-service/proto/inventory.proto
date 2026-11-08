@@ -1,0 +1,66 @@
+
+syntax = "proto3";
+
+package inventory;
+
+service InventoryService {
+    // Get available stock for a product
+    rpc GetStock (GetStockRequest) returns (GetStockResponse);
+
+    // Reserve all requested products atomically
+    rpc ReserveStock (ReserveStockRequest) returns (ReserveStockResponse);
+
+    // Release previously reserved products
+    rpc ReleaseStock (ReleaseStockRequest) returns (ReleaseStockResponse);
+
+    // Add stock or increase existing stock
+    rpc AddStock (AddStockRequest) returns (AddStockResponse);
+}
+
+message GetStockRequest {
+    int64 product_id = 1;
+}
+
+message GetStockResponse {
+    int64 product_id = 1;
+    int32 available_quantity = 2;
+    bool success = 3;
+    string message = 4;
+}
+
+message StockItem {
+    int64 product_id = 1;
+    int32 quantity = 2;
+}
+
+message ReserveStockRequest {
+    string order_reference = 1;
+    repeated StockItem items = 2;
+}
+
+message ReserveStockResponse {
+    bool success = 1;
+    string message = 2;
+    string reservation_id = 3;
+}
+
+message ReleaseStockRequest {
+    string reservation_id = 1;
+}
+
+message ReleaseStockResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message AddStockRequest {
+    int64 product_id = 1;
+    int32 quantity = 2;
+}
+
+message AddStockResponse {
+    bool success = 1;
+    string message = 2;
+    int64 product_id = 3;
+    int32 available_quantity = 4;
+}

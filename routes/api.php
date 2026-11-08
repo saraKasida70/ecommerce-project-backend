@@ -9,12 +9,14 @@ use App\Modules\Users\Controllers\AdminController;
 use App\Modules\Products\Controllers\ProductController;
 use App\Modules\Orders\Controllers\OrderController;
 use App\Modules\Notifications\Controllers\NotificationController;
+use App\Modules\Inventory\Controllers\InventoryController;
 
 Route::prefix('v1')->group(function () {
 
     // Authentication
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:5,1');
 
     // Protected routes
     Route::middleware('auth:api')->group(function () {
@@ -50,7 +52,7 @@ Route::prefix('v1')->group(function () {
             'markAllAsRead',
         ]);
 
-        // Admin
+        // Admin routes
         Route::middleware('admin')->prefix('admin')->group(function () {
 
             Route::post('/users', [AdminController::class, 'store']);
@@ -62,8 +64,22 @@ Route::prefix('v1')->group(function () {
                 'updateStatus',
             ]);
 
+            // Inventory
+            Route::get('/inventory/{productId}', [
+                InventoryController::class,
+                'getStock',
+            ])->whereNumber('productId');
+
+            Route::post('/inventory/reserve', [
+                InventoryController::class,
+                'reserveStock',
+            ]);
+
+            Route::post('/inventory/release', [
+                InventoryController::class,
+                'releaseStock',
+            ]);
+            Route::post('/inventory/add', [InventoryController::class, 'addStock']);
         });
-
     });
-
 });

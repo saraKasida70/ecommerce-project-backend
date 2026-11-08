@@ -31,6 +31,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+  
+  inventory-db:
+    image: postgres:16-alpine
+    container_name: ecommerce_inventory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_password
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  
+  
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: ecommerce_inventory_service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://inventory_user:inventory_password@inventory-db:5432/inventory_db
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+
+
 
   nginx:
     image: nginx:alpine
@@ -46,3 +77,4 @@ services:
 
 volumes:
   mysql_data:
+  inventory_data:
