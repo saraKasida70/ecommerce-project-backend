@@ -34,5 +34,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+     'inventory' => [
+    'host' => env(
+        'INVENTORY_GRPC_HOST',
+        'ecommerce_inventory_service:50051'
+    ),
+],
 ];

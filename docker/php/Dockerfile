@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libicu-dev \
     libonig-dev \
+    libz-dev \
+    protobuf-compiler \
+    $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
@@ -21,6 +24,8 @@ RUN apt-get update && apt-get install -y \
         gd \
         zip \
         intl \
+    && pecl install grpc \
+    && docker-php-ext-enable grpc \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

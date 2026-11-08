@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Products\Services\ProductService;
 use App\Modules\Notifications\Services\NotificationService;
+use App\Modules\Inventory\Services\InventoryGrpcClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class OrderController extends Controller
 {
@@ -16,16 +20,20 @@ class OrderController extends Controller
 
     protected NotificationService $notificationService;
 
+    protected InventoryGrpcClient $inventoryClient;
+
     public function __construct(
         ProductService $productService,
-        NotificationService $notificationService
+        NotificationService $notificationService,
+        InventoryGrpcClient $inventoryClient
     ) {
         $this->productService = $productService;
         $this->notificationService = $notificationService;
+        $this->inventoryClient = $inventoryClient;
     }
 
     /**
-     * عرض طلبات المستخدم الحالي.
+     * Display orders belonging to the authenticated user.
      */
     public function index(Request $request)
     {
@@ -47,7 +55,7 @@ class OrderController extends Controller
     }
 
     /**
-     * إنشاء طلب جديد للمستخدم الحالي.
+     * Create a new order after successfully reserving inventory.
      */
     public function store(Request $request)
     {
@@ -57,6 +65,7 @@ class OrderController extends Controller
                 'required',
                 'integer',
                 'distinct',
+                'min:1',
             ],
             'items.*.quantity' => [
                 'required',
@@ -65,71 +74,154 @@ class OrderController extends Controller
             ],
         ]);
 
-        $productIds = array_column($validated['items'], 'product_id');
+        $productIds = array_column(
+            $validated['items'],
+            'product_id'
+        );
 
-        $order = DB::transaction(function () use (
-            $request,
-            $validated,
-            $productIds
-        ) {
-            $products = $this->productService
-                ->getProductsByIds($productIds)
-                ->keyBy('id');
+        // Retrieve products and calculate order details.
+        $products = $this->productService
+            ->getProductsByIds($productIds)
+            ->keyBy('id');
 
-            if ($products->count() !== count($productIds)) {
-                throw ValidationException::withMessages([
-                    'items' => ['One or more products do not exist.'],
+        if ($products->count() !== count($productIds)) {
+            throw ValidationException::withMessages([
+                'items' => ['One or more products do not exist.'],
+            ]);
+        }
+
+        $total = 0;
+        $orderItems = [];
+
+        foreach ($validated['items'] as $item) {
+            $product = $products->get($item['product_id']);
+
+            $price = $product->price;
+            $quantity = $item['quantity'];
+
+            $total += $price * $quantity;
+
+            $orderItems[] = [
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+                'price' => $price,
+            ];
+        }
+
+        // Generate a unique reference for this reservation.
+        $orderReference = 'ORDER-' . Str::uuid();
+
+        // Step 1: Reserve all products through the inventory service.
+        try {
+            $reservation = $this->inventoryClient->reserveStock(
+                $orderReference,
+                $validated['items']
+            );
+
+        } catch (Throwable $e) {
+            Log::error('Inventory reservation request failed', [
+                'order_reference' => $orderReference,
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Inventory service is currently unavailable. No order was created.',
+            ], 503);
+        }
+
+        // Stop if inventory rejected the reservation.
+        if (!$reservation['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $reservation['message'],
+            ], 409);
+        }
+
+        $reservationId = $reservation['reservation_id'];
+
+        // Step 2: Save the order only after inventory approval.
+        try {
+            $order = DB::transaction(function () use (
+                $request,
+                $total,
+                $orderItems
+            ) {
+                $order = Order::create([
+                    'user_id' => $request->user()->id,
+                    'total' => $total,
+                    'status' => 'pending',
+                ]);
+
+                $order->items()->createMany($orderItems);
+
+                return $order->load('items');
+            });
+
+        } catch (Throwable $e) {
+
+            Log::error('Order creation failed after inventory reservation', [
+                'reservation_id' => $reservationId,
+                'order_reference' => $orderReference,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Step 3: Release reserved stock if saving the order fails.
+            try {
+                $releaseResult = $this->inventoryClient->releaseStock(
+                    $reservationId
+                );
+
+                if (!$releaseResult['success']) {
+                    Log::critical('Inventory reservation could not be released', [
+                        'reservation_id' => $reservationId,
+                        'message' => $releaseResult['message'],
+                    ]);
+                }
+
+            } catch (Throwable $releaseException) {
+                Log::critical('Inventory compensation failed', [
+                    'reservation_id' => $reservationId,
+                    'error' => $releaseException->getMessage(),
                 ]);
             }
 
-            $total = 0;
-            $items = [];
+            return response()->json([
+                'success' => false,
+                'message' => 'Order could not be created. The inventory reservation release was attempted.',
+            ], 500);
+        }
 
-            foreach ($validated['items'] as $item) {
-                $product = $products->get($item['product_id']);
+        // Step 4: Send notification after successful order creation.
+        try {
+            $this->notificationService->send(
+                $request->user(),
+                'Order Created',
+                "Your order #{$order->id} has been created successfully.",
+                [
+                    'order_id' => $order->id,
+                    'status' => $order->status,
+                ]
+            );
 
-                $price = $product->price;
-                $quantity = $item['quantity'];
-
-                $total += $price * $quantity;
-
-                $items[] = [
-                    'product_id' => $product->id,
-                    'quantity' => $quantity,
-                    'price' => $price,
-                ];
-            }
-
-            $order = Order::create([
-                'user_id' => $request->user()->id,
-                'total' => $total,
-                'status' => 'pending',
-            ]);
-
-            $order->items()->createMany($items);
-
-            return $order->load('items');
-        });
-
-        // إرسال إشعار بعد إنشاء الطلب بنجاح.
-        $this->notificationService->send(
-            $request->user(),
-            'Order Created',
-            "Your order #{$order->id} has been created successfully.",
-            [
+        } catch (Throwable $e) {
+            Log::warning('Order notification could not be sent', [
                 'order_id' => $order->id,
-                'status' => $order->status,
-            ]
-        );
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Order created successfully.',
+            'success' => true,
+            'message' => 'Order created and inventory reserved successfully.',
             'data' => $order,
+            'reservation_id' => $reservationId,
         ], 201);
     }
 
     /**
-     * عرض تفاصيل طلب محدد.
+     * Display a specific order.
      */
     public function show(Request $request, Order $order)
     {
@@ -153,7 +245,7 @@ class OrderController extends Controller
     }
 
     /**
-     * تغيير حالة الطلب بواسطة المسؤول فقط.
+     * Update order status by an administrator.
      */
     public function updateStatus(Request $request, Order $order)
     {
@@ -168,7 +260,6 @@ class OrderController extends Controller
             'status' => $validated['status'],
         ]);
 
-        // إرسال إشعار إلى صاحب الطلب بعد تغيير حالته.
         $this->notificationService->send(
             $order->user,
             'Order Status Updated',
