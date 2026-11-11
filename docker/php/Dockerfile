@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y \
         gd \
         zip \
         intl \
-    && pecl install grpc \
-    && docker-php-ext-enable grpc \
+    && pecl install grpc redis \
+    && docker-php-ext-enable grpc redis \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Str;
@@ -8,12 +9,6 @@ return [
     |--------------------------------------------------------------------------
     | Default Database Connection Name
     |--------------------------------------------------------------------------
-    |
-    | Here you may specify which of the database connections below you wish
-    | to use as your default connection for database operations. This is
-    | the connection which will be utilized unless another connection
-    | is explicitly specified when you execute a query / statement.
-    |
     */
 
     'default' => env('DB_CONNECTION', 'sqlite'),
@@ -22,11 +17,6 @@ return [
     |--------------------------------------------------------------------------
     | Database Connections
     |--------------------------------------------------------------------------
-    |
-    | Below are all of the database connections defined for your application.
-    | An example configuration is provided for each database system which
-    | is supported by Laravel. You're free to add / remove connections.
-    |
     */
 
     'connections' => [
@@ -45,10 +35,27 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
+
+            // Read/Write Splitting
+            'read' => [
+                'host' => [
+                    env('DB_READ_HOST', 'mysql-replica'),
+                ],
+            ],
+
+            'write' => [
+                'host' => [
+                    env('DB_WRITE_HOST', 'db'),
+                ],
+            ],
+
+            // Use the primary database for reads after a write
+            // within the same request.
+            'sticky' => true,
+
             'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
+            'database' => env('DB_DATABASE', 'ecommerce_project'),
+            'username' => env('DB_USERNAME', 'laravel'),
             'password' => env('DB_PASSWORD', ''),
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
@@ -57,6 +64,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -118,11 +126,6 @@ return [
     |--------------------------------------------------------------------------
     | Migration Repository Table
     |--------------------------------------------------------------------------
-    |
-    | This table keeps track of all the migrations that have already run for
-    | your application. Using this information, we can determine which of
-    | the migrations on disk haven't actually been run on the database.
-    |
     */
 
     'migrations' => [
@@ -134,11 +137,6 @@ return [
     |--------------------------------------------------------------------------
     | Redis Databases
     |--------------------------------------------------------------------------
-    |
-    | Redis is an open source, fast, and advanced key-value store that also
-    | provides a richer body of commands than a typical key-value system
-    | such as Memcached. You may define your connection settings here.
-    |
     */
 
     'redis' => [
