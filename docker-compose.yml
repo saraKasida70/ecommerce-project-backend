@@ -15,13 +15,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
+      redis:
+        condition: service_healthy
   db:
     image: mysql:8.0
     container_name: ecommerce_db
     restart: unless-stopped
     env_file:
       - .env.docker
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
     ports:
       - "3307:3306"
     volumes:
@@ -31,7 +36,45 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-  
+
+  mysql-replica:
+    image: mysql:8.0
+    container_name: ecommerce_mysql_replica
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: replica_root_password
+      MYSQL_DATABASE: ecommerce_project
+    command:
+      - --server-id=2
+      - --relay-log=relay-bin
+      - --read-only=ON
+      - --super-read-only=ON
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+    volumes:
+      - mysql_replica_data:/var/lib/mysql
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   inventory-db:
     image: postgres:16-alpine
     container_name: ecommerce_inventory_db
@@ -78,3 +121,5 @@ services:
 volumes:
   mysql_data:
   inventory_data:
+  redis_data:
+  mysql_replica_data:
