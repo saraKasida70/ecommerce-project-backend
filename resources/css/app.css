@@ -10,3 +10,23 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border-radius: 1rem;
+}
+
+.alert {
+    border-radius: 0.75rem;
+}
+
+.btn {
+    border-radius: 0.75rem;
+}
+
+.navbar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}

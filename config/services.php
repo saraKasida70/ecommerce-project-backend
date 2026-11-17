@@ -37,7 +37,7 @@ return [
      'inventory' => [
     'host' => env(
         'INVENTORY_GRPC_HOST',
-        'ecommerce_inventory_service:50051'
+        'inventory-service:50051'
     ),
 ],
 ];

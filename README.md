@@ -49,6 +49,18 @@ We would like to extend our thanks to the following sponsors for funding Laravel
 - **[byte5](https://byte5.de)**
 - **[OP.GG](https://op.gg)**
 
+## API Documentation
+
+The project includes an OpenAPI 3.0 document at [openapi.yaml](openapi.yaml). It covers the routes currently defined in the Laravel API and includes JWT bearer authentication.
+
+To view the documentation:
+
+1. Open https://editor.swagger.io/
+2. Import the file [openapi.yaml](openapi.yaml)
+3. Or serve the file locally with Swagger UI and open the generated page in a browser
+
+This file reflects only the real routes defined in [routes/api.php](routes/api.php) and does not add any routes or endpoints that are not present in the application.
+
 ## Contributing
 
 Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).

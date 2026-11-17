@@ -18,6 +18,9 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1');
 
+    // Public routes
+    Route::get('/products', [ProductController::class, 'index']);
+
     // Protected routes
     Route::middleware('auth:api')->group(function () {
 
@@ -30,9 +33,6 @@ Route::prefix('v1')->group(function () {
                 'data' => $request->user(),
             ], 200);
         });
-
-        // Products
-        Route::get('/products', [ProductController::class, 'index']);
 
         // Orders
         Route::get('/orders', [OrderController::class, 'index']);
