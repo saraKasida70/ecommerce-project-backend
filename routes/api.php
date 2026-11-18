@@ -1,0 +1,84 @@
+<?php
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+use App\Modules\Auth\Controllers\AuthController;
+use App\Modules\Users\Controllers\AdminController;
+use App\Modules\Products\Controllers\ProductController;
+use App\Modules\Orders\Controllers\OrderController;
+use App\Modules\Notifications\Controllers\NotificationController;
+use App\Modules\Inventory\Controllers\InventoryController;
+
+Route::prefix('v1')->group(function () {
+
+    // Authentication
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:5,1');
+
+    // Public routes
+    Route::get('/products', [ProductController::class, 'index']);
+
+    // Protected routes
+    Route::middleware('auth:api')->group(function () {
+
+        // Authentication
+        Route::post('/logout', [AuthController::class, 'logout']);
+
+        // User
+        Route::get('/user', function (Request $request) {
+            return response()->json([
+                'data' => $request->user(),
+            ], 200);
+        });
+
+        // Orders
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::post('/orders', [OrderController::class, 'store']);
+        Route::get('/orders/{order}', [OrderController::class, 'show']);
+
+        // Notifications
+        Route::get('/notifications', [NotificationController::class, 'index']);
+
+        Route::patch('/notifications/{id}/read', [
+            NotificationController::class,
+            'markAsRead',
+        ]);
+
+        Route::patch('/notifications/read-all', [
+            NotificationController::class,
+            'markAllAsRead',
+        ]);
+
+        // Admin routes
+        Route::middleware('admin')->prefix('admin')->group(function () {
+
+            Route::post('/users', [AdminController::class, 'store']);
+
+            Route::post('/products', [ProductController::class, 'store']);
+
+            Route::patch('/orders/{order}/status', [
+                OrderController::class,
+                'updateStatus',
+            ]);
+
+            // Inventory
+            Route::get('/inventory/{productId}', [
+                InventoryController::class,
+                'getStock',
+            ])->whereNumber('productId');
+
+            Route::post('/inventory/reserve', [
+                InventoryController::class,
+                'reserveStock',
+            ]);
+
+            Route::post('/inventory/release', [
+                InventoryController::class,
+                'releaseStock',
+            ]);
+            Route::post('/inventory/add', [InventoryController::class, 'addStock']);
+        });
+    });
+});

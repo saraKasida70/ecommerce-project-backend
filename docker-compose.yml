@@ -1,0 +1,143 @@
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ecommerce_app
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    working_dir: /var/www/html
+    env_file:
+      - .env.docker
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: ecommerce_db
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql-replica:
+    image: mysql:8.0
+    container_name: ecommerce_mysql_replica
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: replica_root_password
+      MYSQL_DATABASE: ecommerce_project
+    command:
+      - --server-id=2
+      - --relay-log=relay-bin
+      - --read-only=ON
+      - --super-read-only=ON
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+    volumes:
+      - mysql_replica_data:/var/lib/mysql
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ecommerce_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  inventory-db:
+    image: postgres:16-alpine
+    container_name: ecommerce_inventory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_password
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: ecommerce_inventory_service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://inventory_user:inventory_password@inventory-db:5432/inventory_db
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: ecommerce_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  mysql_data:
+  inventory_data:
+  redis_data:
+  mysql_replica_data:
+  rabbitmq_data:
