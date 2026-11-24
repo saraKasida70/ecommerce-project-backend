@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -65,6 +66,11 @@ return [
 
             'options' => [
                 'heartbeat' => 10,
+                'queue' => [
+                    'reroute_failed' => true,
+                    'failed_exchange' => 'failed',
+                    'failed_routing_key' => '%s.failed',
+                ],
             ],
 
             'after_commit' => true,

@@ -53,6 +53,11 @@ Route::prefix('v1')->group(function () {
 
         // Admin routes
         Route::middleware('admin')->prefix('admin')->group(function () {
+             Route::get('/orders', [
+        OrderController::class,
+        'adminIndex',
+    ]);
+
 
             Route::post('/users', [AdminController::class, 'store']);
 

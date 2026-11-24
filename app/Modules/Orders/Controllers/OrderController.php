@@ -272,7 +272,26 @@ class OrderController extends Controller
             'data' => $order,
         ], 200);
     }
+      /**
+ * Display all orders for administrators.
+ */
+public function adminIndex()
+{
+    $orders = Order::with(['items', 'user'])
+        ->latest()
+        ->paginate(10);
 
+    return response()->json([
+        'message' => 'All orders retrieved successfully.',
+        'data' => $orders->items(),
+        'meta' => [
+            'current_page' => $orders->currentPage(),
+            'last_page' => $orders->lastPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+        ],
+    ], 200);
+}
     /**
      * Update order status by an administrator.
      */

@@ -41,9 +41,7 @@ function setUserBadge(user) {
 
 function showAlert(message, type = 'success') {
     const alert = document.getElementById('appAlert');
-    if (!alert) {
-        return;
-    }
+    if (!alert) return;
 
     alert.className = `alert alert-${type} mt-3`;
     alert.textContent = message;
@@ -52,15 +50,15 @@ function showAlert(message, type = 'success') {
 
 function clearAlert() {
     const alert = document.getElementById('appAlert');
-    if (!alert) {
-        return;
-    }
+    if (!alert) return;
+
     alert.classList.add('d-none');
     alert.textContent = '';
 }
 
 function authHeaders(additional = {}) {
     const token = getToken();
+
     return {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -71,9 +69,9 @@ function authHeaders(additional = {}) {
 
 function apiFetch(path, options = {}) {
     const url = `${API_BASE}${path}`;
+
     return fetch(url, {
         credentials: 'same-origin',
-        headers: authHeaders(),
         ...options,
         headers: {
             ...authHeaders(),
@@ -84,20 +82,51 @@ function apiFetch(path, options = {}) {
         const payload = text ? JSON.parse(text) : {};
 
         if (!response.ok) {
-            const message = payload?.message || 'Request failed.';
-            throw new Error(message);
+            throw new Error(payload?.message || 'Request failed.');
         }
 
         return payload;
     });
 }
+ const customerOrderSubscriptions = new Set();
+let adminOrderSubscribed = false;
+
+function subscribeCustomerOrderChannels(orders) {
+    if (!window.Echo || !Array.isArray(orders)) return;
+
+    orders.forEach((order) => {
+        const orderId = String(order.id);
+
+        if (customerOrderSubscriptions.has(orderId)) return;
+
+        customerOrderSubscriptions.add(orderId);
+
+        window.Echo.private(`orders.${orderId}`)
+            .listen('.order.status.updated', () => {
+                renderOrders();
+            });
+    });
+}
+
+function subscribeAdminOrderChannel() {
+    if (!window.Echo || adminOrderSubscribed) return;
+
+    adminOrderSubscribed = true;
+
+    window.Echo.private('admin.orders')
+        .listen('.order.created', () => {
+            renderAdminOrders();
+        });
+}
 
 function getCurrentUser() {
     const token = getToken();
-    if (!token) {
-        return Promise.resolve(null);
-    }
-    return apiFetch('/user').then((result) => result.data || result.user || null).catch(() => null);
+
+    if (!token) return Promise.resolve(null);
+
+    return apiFetch('/user')
+        .then((result) => result.data || result.user || null)
+        .catch(() => null);
 }
 
 function redirectToLogin() {
@@ -105,11 +134,13 @@ function redirectToLogin() {
 }
 
 function isProtectedPage() {
-    return ['cart', 'checkout', 'orders', 'notifications'].some((segment) => window.location.pathname.includes(segment));
+    return ['cart', 'checkout', 'orders', 'notifications']
+        .some((segment) => window.location.pathname.includes(segment));
 }
 
 function attachAuthUI() {
     const logoutBtn = document.getElementById('logoutBtn');
+
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             try {
@@ -128,17 +159,17 @@ function attachAuthUI() {
 
     getCurrentUser().then((user) => {
         setUserBadge(user);
+
         if (isProtectedPage() && !user) {
             redirectToLogin();
         }
     });
 }
 
+// Login: admins go to /admin, customers go to /products.
 function handleLoginSubmit() {
     const form = document.getElementById('loginForm');
-    if (!form) {
-        return;
-    }
+    if (!form) return;
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -154,9 +185,23 @@ function handleLoginSubmit() {
             });
 
             if (response.access_token) {
+                console.log('LOGIN USER:', response.user);
+                console.log('LOGIN ROLE:', response.user?.role);
+
                 setToken(response.access_token);
                 setUserBadge(response.user || null);
-                window.location.href = '/products';
+
+                const role = String(response.user?.role || '')
+                    .trim()
+                    .toLowerCase();
+
+                if (role === 'admin') {
+                    window.location.href = '/admin';
+                } else {
+                    window.location.href = '/products';
+                }
+            } else {
+                showAlert('Login failed. Please try again.', 'danger');
             }
         } catch (error) {
             showAlert(error.message || 'Login failed.', 'danger');
@@ -166,9 +211,7 @@ function handleLoginSubmit() {
 
 function handleRegisterSubmit() {
     const form = document.getElementById('registerForm');
-    if (!form) {
-        return;
-    }
+    if (!form) return;
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -177,7 +220,8 @@ function handleRegisterSubmit() {
         const name = document.getElementById('registerName').value.trim();
         const email = document.getElementById('registerEmail').value.trim();
         const password = document.getElementById('registerPassword').value;
-        const passwordConfirmation = document.getElementById('registerPasswordConfirmation').value;
+        const passwordConfirmation =
+            document.getElementById('registerPasswordConfirmation').value;
 
         if (password !== passwordConfirmation) {
             showAlert('Passwords do not match.', 'warning');
@@ -242,20 +286,17 @@ function renderProducts() {
     const container = document.getElementById('productsContainer');
     const loading = document.getElementById('productsLoading');
 
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     apiFetch('/products')
         .then((response) => {
             const products = response.data || [];
 
-            if (loading) {
-                loading.classList.add('d-none');
-            }
+            loading?.classList.add('d-none');
 
             if (!products.length) {
-                container.innerHTML = '<div class="col-12"><div class="alert alert-warning">No products available.</div></div>';
+                container.innerHTML =
+                    '<div class="col-12"><div class="alert alert-warning">No products available.</div></div>';
                 return;
             }
 
@@ -277,33 +318,35 @@ function renderProducts() {
 
             document.querySelectorAll('.add-to-cart').forEach((button) => {
                 button.addEventListener('click', () => {
-                    const product = JSON.parse(button.dataset.product.replace(/&apos;/g, "'"));
+                    const product = JSON.parse(
+                        button.dataset.product.replace(/&apos;/g, "'")
+                    );
                     addToCart(product);
                 });
             });
         })
         .catch((error) => {
-            if (loading) {
-                loading.classList.add('d-none');
-            }
-            container.innerHTML = `<div class="col-12"><div class="alert alert-danger">${error.message}</div></div>`;
+            loading?.classList.add('d-none');
+            container.innerHTML =
+                `<div class="col-12"><div class="alert alert-danger">${error.message}</div></div>`;
         });
 }
 
 function renderCart() {
     const container = document.getElementById('cartContainer');
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     const cart = getCart();
 
     if (!cart.length) {
-        container.innerHTML = '<div class="alert alert-info">Your cart is empty.</div>';
+        container.innerHTML =
+            '<div class="alert alert-info">Your cart is empty.</div>';
         return;
     }
 
-    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity, 0
+    );
 
     container.innerHTML = `
         <div class="card shadow-sm border-0">
@@ -352,15 +395,21 @@ function renderCheckout() {
     const cart = getCart();
 
     if (!cart.length) {
-        itemsContainer.innerHTML = '<div class="alert alert-info">Your cart is empty. Add products before checkout.</div>';
+        itemsContainer.innerHTML =
+            '<div class="alert alert-info">Your cart is empty. Add products before checkout.</div>';
         itemCount.textContent = '0';
         totalElement.textContent = '$0.00';
         placeOrderBtn.disabled = true;
         return;
     }
 
-    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    itemCount.textContent = String(cart.reduce((sum, item) => sum + item.quantity, 0));
+    const subtotal = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity, 0
+    );
+
+    itemCount.textContent = String(
+        cart.reduce((sum, item) => sum + item.quantity, 0)
+    );
     totalElement.textContent = `$${subtotal.toFixed(2)}`;
 
     itemsContainer.innerHTML = cart.map((item) => `
@@ -373,8 +422,13 @@ function renderCheckout() {
         </div>
     `).join('');
 
+    if (placeOrderBtn.dataset.listenerAttached === 'true') return;
+    placeOrderBtn.dataset.listenerAttached = 'true';
+
     placeOrderBtn.disabled = false;
     placeOrderBtn.addEventListener('click', async () => {
+        placeOrderBtn.disabled = true;
+
         try {
             const payload = {
                 items: cart.map((item) => ({
@@ -389,33 +443,31 @@ function renderCheckout() {
             });
 
             saveCart([]);
-            renderCheckout();
             showAlert(response.message || 'Order placed successfully.', 'success');
             window.location.href = '/orders';
         } catch (error) {
+            placeOrderBtn.disabled = false;
             showAlert(error.message || 'Unable to place order.', 'danger');
         }
-    }, { once: true });
+    });
 }
 
 function renderOrders() {
     const loading = document.getElementById('ordersLoading');
     const container = document.getElementById('ordersContainer');
 
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     apiFetch('/orders')
         .then((response) => {
-            if (loading) {
-                loading.classList.add('d-none');
-            }
+            loading?.classList.add('d-none');
 
             const orders = response.data || [];
+            subscribeCustomerOrderChannels(orders);
 
             if (!orders.length) {
-                container.innerHTML = '<div class="alert alert-info">You have no orders yet.</div>';
+                container.innerHTML =
+                    '<div class="alert alert-info">You have no orders yet.</div>';
                 return;
             }
 
@@ -433,26 +485,32 @@ function renderOrders() {
             `).join('');
         })
         .catch((error) => {
-            if (loading) {
-                loading.classList.add('d-none');
-            }
-            container.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            loading?.classList.add('d-none');
+            container.innerHTML =
+                `<div class="alert alert-danger">${error.message}</div>`;
         });
 }
 
 function getAdminPagesAccess() {
-    const token = getToken();
-    if (!token) {
-        return false;
-    }
-    return getCurrentUser().then((user) => !!(user && user.role === 'admin'));
+    if (!getToken()) return false;
+
+    return getCurrentUser().then(
+        (user) => !!(
+            user &&
+            String(user.role || '').trim().toLowerCase() === 'admin'
+        )
+    );
 }
 
 async function enforceAdminAccess() {
-    const isAdminPage = ['/admin', '/admin/orders', '/admin/inventory', '/admin/users'].some((path) => window.location.pathname.startsWith(path));
-    if (!isAdminPage) {
-        return;
-    }
+    const isAdminPage = [
+        '/admin',
+        '/admin/orders',
+        '/admin/inventory',
+        '/admin/users',
+    ].some((path) => window.location.pathname.startsWith(path));
+
+    if (!isAdminPage) return;
 
     const user = await getCurrentUser();
 
@@ -461,9 +519,10 @@ async function enforceAdminAccess() {
         return;
     }
 
-    if (user.role !== 'admin') {
+    const role = String(user.role || '').trim().toLowerCase();
+
+    if (role !== 'admin') {
         window.location.href = '/products';
-        return;
     }
 }
 
@@ -472,13 +531,15 @@ async function renderAdminDashboard() {
     const orderCount = document.getElementById('adminOrderCount');
     const productCount = document.getElementById('adminProductCount');
 
-    if (!statusBox) {
-        return;
-    }
+    if (!statusBox) return;
 
     try {
         const user = await getCurrentUser();
-        if (!user || user.role !== 'admin') {
+
+        if (
+            !user ||
+            String(user.role || '').trim().toLowerCase() !== 'admin'
+        ) {
             statusBox.className = 'alert alert-danger mb-0';
             statusBox.textContent = 'Access denied. Admin rights required.';
             return;
@@ -487,12 +548,8 @@ async function renderAdminDashboard() {
         statusBox.className = 'alert alert-success mb-0';
         statusBox.textContent = 'Admin access confirmed.';
 
-        if (orderCount) {
-            orderCount.textContent = 'Checking...';
-        }
-        if (productCount) {
-            productCount.textContent = 'Checking...';
-        }
+        if (orderCount) orderCount.textContent = 'Checking...';
+        if (productCount) productCount.textContent = 'Checking...';
 
         const [ordersResponse, productsResponse] = await Promise.all([
             apiFetch('/orders'),
@@ -500,14 +557,16 @@ async function renderAdminDashboard() {
         ]);
 
         if (orderCount) {
-            orderCount.textContent = String((ordersResponse.data || []).length || 0);
+            orderCount.textContent = String((ordersResponse.data || []).length);
         }
+
         if (productCount) {
-            productCount.textContent = String((productsResponse.data || []).length || 0);
+            productCount.textContent = String((productsResponse.data || []).length);
         }
     } catch (error) {
         statusBox.className = 'alert alert-danger mb-0';
-        statusBox.textContent = error.message || 'Unable to load admin dashboard.';
+        statusBox.textContent =
+            error.message || 'Unable to load admin dashboard.';
     }
 }
 
@@ -515,17 +574,17 @@ async function renderAdminOrders() {
     const container = document.getElementById('adminOrdersContainer');
     const statusBox = document.getElementById('adminOrdersStatus');
 
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     try {
-        const response = await apiFetch('/orders');
+        const response = await apiFetch('/admin/orders');
         const orders = response.data || [];
-
+         subscribeAdminOrderChannel();
         if (!orders.length) {
-            container.innerHTML = '<div class="alert alert-info">No orders found.</div>';
-            statusBox.textContent = 'No orders available.';
+            container.innerHTML =
+                '<div class="alert alert-info">No orders found.</div>';
+
+            if (statusBox) statusBox.textContent = 'No orders available.';
             return;
         }
 
@@ -539,7 +598,7 @@ async function renderAdminOrders() {
                     <p class="mb-3"><strong>Total:</strong> $${Number(order.total || 0).toFixed(2)}</p>
                     <div class="row g-2 align-items-center">
                         <div class="col-md-8">
-                            <select class="form-select order-status-select" data-order-id="${order.id}" data-current-status="${order.status || 'pending'}">
+                            <select class="form-select order-status-select" data-order-id="${order.id}">
                                 <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>pending</option>
                                 <option value="processing" ${order.status === 'processing' ? 'selected' : ''}>processing</option>
                                 <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>shipped</option>
@@ -558,28 +617,44 @@ async function renderAdminOrders() {
         document.querySelectorAll('.update-order-status').forEach((button) => {
             button.addEventListener('click', async () => {
                 const orderId = button.dataset.orderId;
-                const select = document.querySelector(`.order-status-select[data-order-id="${orderId}"]`);
+                const select = document.querySelector(
+                    `.order-status-select[data-order-id="${orderId}"]`
+                );
                 const status = select ? select.value : 'pending';
 
                 try {
-                    const res = await apiFetch(`/admin/orders/${orderId}/status`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ status }),
-                    });
+                    const res = await apiFetch(
+                        `/admin/orders/${orderId}/status`,
+                        {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status }),
+                        }
+                    );
 
-                    statusBox.textContent = res.message || 'Order status updated.';
-                    statusBox.className = 'alert alert-success';
+                    if (statusBox) {
+                        statusBox.textContent =
+                            res.message || 'Order status updated.';
+                        statusBox.className = 'alert alert-success';
+                    }
+
                     await renderAdminOrders();
                 } catch (error) {
-                    statusBox.textContent = error.message || 'Failed to update order status.';
-                    statusBox.className = 'alert alert-danger';
+                    if (statusBox) {
+                        statusBox.textContent =
+                            error.message || 'Failed to update order status.';
+                        statusBox.className = 'alert alert-danger';
+                    }
                 }
             });
         });
     } catch (error) {
-        statusBox.textContent = error.message || 'Unable to load orders.';
-        statusBox.className = 'alert alert-danger';
-        container.innerHTML = '<div class="alert alert-danger">Unable to load orders.</div>';
+        if (statusBox) {
+            statusBox.textContent = error.message || 'Unable to load orders.';
+            statusBox.className = 'alert alert-danger';
+        }
+
+        container.innerHTML =
+            '<div class="alert alert-danger">Unable to load orders.</div>';
     }
 }
 
@@ -589,25 +664,30 @@ async function renderInventoryManagement() {
     const reserveBtn = document.getElementById('reserveStockBtn');
     const releaseBtn = document.getElementById('releaseStockBtn');
 
-    if (!getBtn || !addBtn || !reserveBtn || !releaseBtn) {
-        return;
-    }
+    if (!getBtn || !addBtn || !reserveBtn || !releaseBtn) return;
 
     getBtn.addEventListener('click', async () => {
-        const productId = Number(document.getElementById('stockProductId').value || 0);
+        const productId = Number(
+            document.getElementById('stockProductId').value || 0
+        );
         const box = document.getElementById('stockResult');
 
         try {
             const response = await apiFetch(`/admin/inventory/${productId}`);
             box.innerHTML = `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
         } catch (error) {
-            box.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
+            box.innerHTML =
+                `<div class="alert alert-danger mb-0">${error.message}</div>`;
         }
     });
 
     addBtn.addEventListener('click', async () => {
-        const productId = Number(document.getElementById('addStockProductId').value || 0);
-        const quantity = Number(document.getElementById('addStockQuantity').value || 0);
+        const productId = Number(
+            document.getElementById('addStockProductId').value || 0
+        );
+        const quantity = Number(
+            document.getElementById('addStockQuantity').value || 0
+        );
         const box = document.getElementById('addStockResult');
 
         try {
@@ -615,9 +695,12 @@ async function renderInventoryManagement() {
                 method: 'POST',
                 body: JSON.stringify({ product_id: productId, quantity }),
             });
-            box.innerHTML = `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
+
+            box.innerHTML =
+                `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
         } catch (error) {
-            box.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
+            box.innerHTML =
+                `<div class="alert alert-danger mb-0">${error.message}</div>`;
         }
     });
 
@@ -630,26 +713,35 @@ async function renderInventoryManagement() {
             const items = JSON.parse(itemsText);
             const response = await apiFetch('/admin/inventory/reserve', {
                 method: 'POST',
-                body: JSON.stringify({ order_reference: orderReference, items }),
+                body: JSON.stringify({
+                    order_reference: orderReference,
+                    items,
+                }),
             });
-            box.innerHTML = `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
+
+            box.innerHTML =
+                `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
         } catch (error) {
-            box.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
+            box.innerHTML =
+                `<div class="alert alert-danger mb-0">${error.message}</div>`;
         }
     });
 
     releaseBtn.addEventListener('click', async () => {
         const orderReference = document.getElementById('reserveOrderRef').value;
-        const box = document.getElementById('reserveResult');
+        const box = document.getElementById('releaseStockResult');
 
         try {
             const response = await apiFetch('/admin/inventory/release', {
                 method: 'POST',
                 body: JSON.stringify({ reservation_id: orderReference }),
             });
-            box.innerHTML = `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
+
+            box.innerHTML =
+                `<pre class="mb-0">${JSON.stringify(response, null, 2)}</pre>`;
         } catch (error) {
-            box.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
+            box.innerHTML =
+                `<div class="alert alert-danger mb-0">${error.message}</div>`;
         }
     });
 }
@@ -661,9 +753,7 @@ async function renderInventoryTestPage() {
     const reserveBtn = document.getElementById('testReserveBtn');
     const releaseBtn = document.getElementById('testReleaseBtn');
 
-    if (!resultBox) {
-        return;
-    }
+    if (!resultBox) return;
 
     const renderError = (message) => {
         resultBox.className = 'mt-4 alert alert-danger';
@@ -677,7 +767,9 @@ async function renderInventoryTestPage() {
 
     getBtn?.addEventListener('click', async () => {
         try {
-            const productId = Number(document.getElementById('testProductId').value || 0);
+            const productId = Number(
+                document.getElementById('testProductId').value || 0
+            );
             const response = await apiFetch(`/admin/inventory/${productId}`);
             renderSuccess(`GET STOCK\n${JSON.stringify(response, null, 2)}`);
         } catch (error) {
@@ -687,12 +779,17 @@ async function renderInventoryTestPage() {
 
     addBtn?.addEventListener('click', async () => {
         try {
-            const productId = Number(document.getElementById('testProductId').value || 0);
-            const quantity = Number(document.getElementById('testQuantity').value || 0);
+            const productId = Number(
+                document.getElementById('testProductId').value || 0
+            );
+            const quantity = Number(
+                document.getElementById('testQuantity').value || 0
+            );
             const response = await apiFetch('/admin/inventory/add', {
                 method: 'POST',
                 body: JSON.stringify({ product_id: productId, quantity }),
             });
+
             renderSuccess(`ADD STOCK\n${JSON.stringify(response, null, 2)}`);
         } catch (error) {
             renderError(error.message || 'Add stock failed.');
@@ -701,9 +798,14 @@ async function renderInventoryTestPage() {
 
     reserveBtn?.addEventListener('click', async () => {
         try {
-            const productId = Number(document.getElementById('testProductId').value || 0);
-            const quantity = Number(document.getElementById('testQuantity').value || 0);
+            const productId = Number(
+                document.getElementById('testProductId').value || 0
+            );
+            const quantity = Number(
+                document.getElementById('testQuantity').value || 0
+            );
             const ref = document.getElementById('testRef').value;
+
             const response = await apiFetch('/admin/inventory/reserve', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -711,6 +813,7 @@ async function renderInventoryTestPage() {
                     items: [{ product_id: productId, quantity }],
                 }),
             });
+
             renderSuccess(`RESERVE\n${JSON.stringify(response, null, 2)}`);
         } catch (error) {
             renderError(error.message || 'Reserve stock failed.');
@@ -724,6 +827,7 @@ async function renderInventoryTestPage() {
                 method: 'POST',
                 body: JSON.stringify({ reservation_id: ref }),
             });
+
             renderSuccess(`RELEASE\n${JSON.stringify(response, null, 2)}`);
         } catch (error) {
             renderError(error.message || 'Release stock failed.');
@@ -732,9 +836,7 @@ async function renderInventoryTestPage() {
 }
 
 function normalizeNotificationData(notification) {
-    if (!notification || !notification.data) {
-        return {};
-    }
+    if (!notification || !notification.data) return {};
 
     if (typeof notification.data === 'object') {
         return notification.data;
@@ -752,26 +854,33 @@ async function renderNotifications() {
     const statusBox = document.getElementById('notificationsStatus');
     const markAllBtn = document.getElementById('markAllNotificationsRead');
 
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
     try {
         const response = await apiFetch('/notifications');
         const notifications = response.data || [];
 
         if (!notifications.length) {
-            statusBox.textContent = 'You have no notifications.';
-            container.innerHTML = '<div class="alert alert-info">No notifications available.</div>';
+            if (statusBox) statusBox.textContent = 'You have no notifications.';
+            container.innerHTML =
+                '<div class="alert alert-info">No notifications available.</div>';
             return;
         }
 
-        const unreadCount = notifications.filter((notification) => !notification.read_at).length;
-        statusBox.textContent = unreadCount > 0 ? `${unreadCount} unread notifications.` : 'All notifications are read.';
+        const unreadCount = notifications.filter(
+            (notification) => !notification.read_at
+        ).length;
+
+        if (statusBox) {
+            statusBox.textContent = unreadCount > 0
+                ? `${unreadCount} unread notifications.`
+                : 'All notifications are read.';
+        }
 
         container.innerHTML = notifications.map((notification) => {
             const data = normalizeNotificationData(notification);
-            const message = data.message || data.title || data.body || notification.type || 'Notification';
+            const message = data.message || data.title || data.body ||
+                notification.type || 'Notification';
             const isUnread = !notification.read_at;
 
             return `
@@ -803,32 +912,56 @@ async function renderNotifications() {
                 const notificationId = button.dataset.id;
 
                 try {
-                    const result = await apiFetch(`/notifications/${notificationId}/read`, {
-                        method: 'PATCH',
-                    });
-                    showAlert(result.message || 'Notification marked as read.', 'success');
+                    const result = await apiFetch(
+                        `/notifications/${notificationId}/read`,
+                        { method: 'PATCH' }
+                    );
+
+                    showAlert(
+                        result.message || 'Notification marked as read.',
+                        'success'
+                    );
                     await renderNotifications();
                 } catch (error) {
-                    showAlert(error.message || 'Unable to mark notification as read.', 'danger');
+                    showAlert(
+                        error.message || 'Unable to mark notification as read.',
+                        'danger'
+                    );
                 }
             });
         });
 
-        markAllBtn?.addEventListener('click', async () => {
-            try {
-                const result = await apiFetch('/notifications/read-all', {
-                    method: 'PATCH',
-                });
-                showAlert(result.message || 'All notifications marked as read.', 'success');
-                await renderNotifications();
-            } catch (error) {
-                showAlert(error.message || 'Unable to mark all notifications as read.', 'danger');
-            }
-        });
+        if (markAllBtn && markAllBtn.dataset.listenerAttached !== 'true') {
+            markAllBtn.dataset.listenerAttached = 'true';
+
+            markAllBtn.addEventListener('click', async () => {
+                try {
+                    const result = await apiFetch('/notifications/read-all', {
+                        method: 'PATCH',
+                    });
+
+                    showAlert(
+                        result.message || 'All notifications marked as read.',
+                        'success'
+                    );
+                    await renderNotifications();
+                } catch (error) {
+                    showAlert(
+                        error.message || 'Unable to mark all notifications as read.',
+                        'danger'
+                    );
+                }
+            });
+        }
     } catch (error) {
-        statusBox.textContent = error.message || 'Unable to load notifications.';
-        statusBox.className = 'alert alert-danger';
-        container.innerHTML = `<div class="alert alert-danger">${error.message || 'Unable to load notifications.'}</div>`;
+        if (statusBox) {
+            statusBox.textContent =
+                error.message || 'Unable to load notifications.';
+            statusBox.className = 'alert alert-danger';
+        }
+
+        container.innerHTML =
+            `<div class="alert alert-danger">${error.message || 'Unable to load notifications.'}</div>`;
     }
 }
 
@@ -836,23 +969,30 @@ async function renderAdminUsers() {
     const form = document.getElementById('adminUserForm');
     const statusBox = document.getElementById('adminUsersStatus');
 
-    if (!form) {
-        return;
-    }
+    if (!form) return;
 
     try {
         const user = await getCurrentUser();
 
-        if (!user || user.role !== 'admin') {
+        if (
+            !user ||
+            String(user.role || '').trim().toLowerCase() !== 'admin'
+        ) {
             window.location.href = '/products';
             return;
         }
 
-        statusBox.textContent = 'Admin access confirmed. The current API supports creating users only.';
-        statusBox.className = 'alert alert-info';
+        if (statusBox) {
+            statusBox.textContent =
+                'Admin access confirmed. The current API supports creating users only.';
+            statusBox.className = 'alert alert-info';
+        }
     } catch (error) {
-        statusBox.textContent = error.message || 'Unable to verify admin access.';
-        statusBox.className = 'alert alert-danger';
+        if (statusBox) {
+            statusBox.textContent =
+                error.message || 'Unable to verify admin access.';
+            statusBox.className = 'alert alert-danger';
+        }
     }
 
     form.addEventListener('submit', async (event) => {
@@ -863,7 +1003,8 @@ async function renderAdminUsers() {
             name: formData.get('name')?.toString().trim(),
             email: formData.get('email')?.toString().trim(),
             password: formData.get('password')?.toString(),
-            password_confirmation: formData.get('password_confirmation')?.toString(),
+            password_confirmation:
+                formData.get('password_confirmation')?.toString(),
             role: formData.get('role')?.toString(),
         };
 
@@ -873,13 +1014,19 @@ async function renderAdminUsers() {
                 body: JSON.stringify(payload),
             });
 
-            statusBox.textContent = result.message || 'User created successfully.';
-            statusBox.className = 'alert alert-success';
+            if (statusBox) {
+                statusBox.textContent =
+                    result.message || 'User created successfully.';
+                statusBox.className = 'alert alert-success';
+            }
+
             form.reset();
         } catch (error) {
-            const message = error.message || 'Unable to create user.';
-            statusBox.textContent = message;
-            statusBox.className = 'alert alert-danger';
+            if (statusBox) {
+                statusBox.textContent =
+                    error.message || 'Unable to create user.';
+                statusBox.className = 'alert alert-danger';
+            }
         }
     });
 }
@@ -889,48 +1036,34 @@ function initPage() {
     handleLoginSubmit();
     handleRegisterSubmit();
 
-    if (window.location.pathname.startsWith('/products')) {
-        renderProducts();
-    }
+    const path = window.location.pathname;
 
-    if (window.location.pathname.startsWith('/cart')) {
-        renderCart();
-    }
+    if (path.startsWith('/products')) renderProducts();
+    if (path.startsWith('/cart')) renderCart();
+    if (path.startsWith('/checkout')) renderCheckout();
+    if (path.startsWith('/orders')) renderOrders();
+    if (path.startsWith('/notifications')) renderNotifications();
 
-    if (window.location.pathname.startsWith('/checkout')) {
-        renderCheckout();
-    }
+    if (path.startsWith('/admin')) {
+        enforceAdminAccess().then(async () => {
+            // Do not render admin data if access check redirected the user.
+            if (window.location.pathname !== path) return;
 
-    if (window.location.pathname.startsWith('/orders')) {
-        renderOrders();
-    }
-
-    if (window.location.pathname.startsWith('/notifications')) {
-        renderNotifications();
-    }
-
-    if (window.location.pathname.startsWith('/admin')) {
-        enforceAdminAccess().then(() => {
-            if (window.location.pathname === '/admin') {
-                renderAdminDashboard();
-            }
-            if (window.location.pathname === '/admin/orders') {
-                renderAdminOrders();
-            }
-            if (window.location.pathname === '/admin/inventory') {
-                renderInventoryManagement();
-            }
-            if (window.location.pathname === '/admin/users') {
-                renderAdminUsers();
-            }
+            if (path === '/admin') await renderAdminDashboard();
+            if (path === '/admin/orders') await renderAdminOrders();
+            if (path === '/admin/inventory') await renderInventoryManagement();
+            if (path === '/admin/users') await renderAdminUsers();
         });
     }
 
-    if (window.location.pathname.startsWith('/inventory/test')) {
+    if (path.startsWith('/inventory/test')) {
         enforceAdminAccess().then(() => {
-            renderInventoryTestPage();
+            if (window.location.pathname === path) {
+                renderInventoryTestPage();
+            }
         });
     }
 }
 
 window.addEventListener('DOMContentLoaded', initPage);
+
